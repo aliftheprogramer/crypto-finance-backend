@@ -4,12 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/alif/crypto-portfolio/domain"
 )
 
 type combinedPriceData struct {
@@ -18,6 +17,7 @@ type combinedPriceData struct {
 }
 
 var combinedCache = NewCache(2 * time.Minute)
+var historyCache = NewCache(5 * time.Minute)
 
 type CoinGeckoProvider struct {
 	http        *http.Client
@@ -85,6 +85,7 @@ func (c *CoinGeckoProvider) getCombined(symbols []string) (*combinedPriceData, e
 	sorted := joinSorted(symbols)
 	cacheKey := "cg:" + sorted
 	if cached := combinedCache.Get(cacheKey); cached != nil {
+		log.Printf("[coingecko] fetch combined: %s → cache HIT", sorted)
 		return cached.(*combinedPriceData), nil
 	}
 
@@ -106,21 +107,29 @@ func (c *CoinGeckoProvider) getCombined(symbols []string) (*combinedPriceData, e
 		}, nil
 	}
 
-	var result *combinedPriceData
-	var lastErr error
-	for attempt := 0; attempt < 3; attempt++ {
-		if attempt > 0 {
-			time.Sleep(time.Duration(attempt*2) * time.Second)
-		}
-
-		result, lastErr = c.doFetchCombined(geckoIDs)
-		if lastErr == nil {
-			combinedCache.Set(cacheKey, result)
-			return result, nil
-		}
+	tryOnce := func() (*combinedPriceData, error) {
+		return c.doFetchCombined(geckoIDs)
 	}
 
-	return nil, lastErr
+	result, err := tryOnce()
+	if err == nil {
+		log.Printf("[coingecko] fetch combined: %s → 200 OK", sorted)
+		combinedCache.Set(cacheKey, result)
+		return result, nil
+	}
+
+	// Retry once after 1s
+	log.Printf("[coingecko] fetch combined: %s → retry after error", sorted)
+	time.Sleep(1 * time.Second)
+	result, err = tryOnce()
+	if err == nil {
+		log.Printf("[coingecko] fetch combined: %s → 200 OK (retry)", sorted)
+		combinedCache.Set(cacheKey, result)
+		return result, nil
+	}
+
+	log.Printf("[coingecko] fetch combined: %s → failed: %v", sorted, err)
+	return nil, err
 }
 
 func (c *CoinGeckoProvider) doFetchCombined(geckoIDs []string) (*combinedPriceData, error) {
@@ -244,58 +253,4 @@ func (c *CoinGeckoProvider) doFetchRates() (map[string]float64, error) {
 	}, nil
 }
 
-// FetchHistory implements domain.HistoryProvider
-func (c *CoinGeckoProvider) FetchHistory(symbol string, days int) ([]domain.PricePoint, error) {
-	geckoID, ok := symbolToGeckoID[symbol]
-	if !ok {
-		return nil, fmt.Errorf("unknown symbol: %s", symbol)
-	}
 
-	url := fmt.Sprintf("https://api.coingecko.com/api/v3/coins/%s/market_chart?vs_currency=idr&days=%d", geckoID, days)
-
-	resp, err := c.http.Get(url)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("coingecko history error (%d): %s", resp.StatusCode, string(body))
-	}
-
-	var result struct {
-		Prices [][]float64 `json:"prices"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	// Sample to max 200 points for frontend chart
-	points := result.Prices
-	if len(points) > 200 {
-		step := float64(len(points)) / 200
-		var sampled [][]float64
-		for i := 0; i < 200; i++ {
-			idx := int(float64(i) * step)
-			if idx >= len(points) {
-				idx = len(points) - 1
-			}
-			sampled = append(sampled, points[idx])
-		}
-		points = sampled
-	}
-
-	history := make([]domain.PricePoint, len(points))
-	for i, p := range points {
-		history[i] = domain.PricePoint{
-			Timestamp: int64(p[0]) / 1000,
-			Price:     p[1],
-		}
-	}
-
-	return history, nil
-}

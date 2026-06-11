@@ -56,11 +56,12 @@ func (uc *portfolioUsecase) GetPortfolio() (*domain.Portfolio, error) {
 
 	for r := range resultsCh {
 		if r.err != nil {
-			log.Printf("Warning: skipping %s — %v", r.fetcherName, r.err)
+			log.Printf("[portfolio] fetcher %s skipped: %v", r.fetcherName, r.err)
 			continue
 		}
 		allResults = append(allResults, r)
 	}
+	log.Printf("[portfolio] fetchers: %d success, %d skipped", len(allResults), len(uc.fetchers)-len(allResults))
 
 	symbolSet := make(map[string]bool)
 	for _, res := range allResults {
@@ -78,7 +79,7 @@ func (uc *portfolioUsecase) GetPortfolio() (*domain.Portfolio, error) {
 	for _, provider := range uc.priceProviders {
 		providerPrices, err := provider.FetchPrices(symbols)
 		if err != nil {
-			log.Printf("Warning: price provider error: %v", err)
+			log.Printf("[portfolio] price provider error: %v", err)
 			continue
 		}
 		for k, v := range providerPrices {
@@ -87,6 +88,7 @@ func (uc *portfolioUsecase) GetPortfolio() (*domain.Portfolio, error) {
 			}
 		}
 	}
+	log.Printf("[portfolio] prices: %d/%d symbols priced", len(prices), len(symbols))
 
 	changes := make(map[string]float64)
 	if uc.changeProvider != nil {
@@ -119,5 +121,7 @@ func (uc *portfolioUsecase) GetPortfolio() (*domain.Portfolio, error) {
 		}
 	}
 
-	return domain.NewPortfolio(assets, prices, rates), nil
+	portfolio := domain.NewPortfolio(assets, prices, rates)
+	log.Printf("[portfolio] total: Rp %.0f (%d assets)", portfolio.TotalNetWorthIDR, len(portfolio.Assets))
+	return portfolio, nil
 }

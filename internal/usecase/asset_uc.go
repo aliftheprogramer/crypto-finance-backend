@@ -1,6 +1,8 @@
 package usecase
 
 import (
+	"log"
+
 	"github.com/alif/crypto-portfolio/domain"
 )
 
@@ -19,15 +21,8 @@ func NewAssetUsecase(priceProvider domain.PriceProvider, changeProvider domain.C
 }
 
 func (uc *assetUsecase) GetAssetDetail(symbol string) (*domain.AssetDetail, error) {
-	prices, err := uc.priceProvider.FetchPrices([]string{symbol})
-	if err != nil {
-		return nil, err
-	}
-
-	price, ok := prices[symbol]
-	if !ok || price <= 0 {
-		return nil, nil
-	}
+	prices, _ := uc.priceProvider.FetchPrices([]string{symbol})
+	price := prices[symbol]
 
 	changes, err := uc.changeProvider.FetchChanges24h([]string{symbol})
 	if err != nil {
@@ -39,6 +34,11 @@ func (uc *assetUsecase) GetAssetDetail(symbol string) (*domain.AssetDetail, erro
 		history = []domain.PricePoint{}
 	}
 
+	if price <= 0 && len(history) > 0 {
+		price = history[len(history)-1].Price
+		log.Printf("[asset] %s: price fallback from history = Rp %.0f", symbol, price)
+	}
+
 	changePct := computeChanges(history)
 
 	if changePct == nil {
@@ -47,6 +47,8 @@ func (uc *assetUsecase) GetAssetDetail(symbol string) (*domain.AssetDetail, erro
 	if c24h, ok := changes[symbol]; ok {
 		changePct["1d"] = c24h
 	}
+
+	log.Printf("[asset] %s: price Rp %.0f, history %d points", symbol, price, len(history))
 
 	return &domain.AssetDetail{
 		Name:     symbol,

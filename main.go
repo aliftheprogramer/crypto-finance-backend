@@ -15,6 +15,9 @@ import (
 func main() {
 	cfg := config.Load()
 
+	// Init DB (SQLite)
+	repository.GetDB()
+
 	fetchers := repository.CreateFetchers(cfg.Sources)
 	coingecko := repository.NewCoinGeckoProvider()
 
@@ -24,8 +27,18 @@ func main() {
 	}, coingecko, coingecko)
 
 	assetUsecase := usecase.NewAssetUsecase(coingecko, coingecko, coingecko)
+	signalUsecase := usecase.NewSignalUsecase(coingecko)
 
-	handler := http.NewPortfolioHandler(portfolioUsecase, assetUsecase)
+	var aiSignalUsecase *usecase.AISignalUsecase
+	if cfg.DeepSeekAPIKey != "" {
+		deepseek := repository.NewDeepSeekProvider(cfg.DeepSeekAPIKey)
+		aiSignalUsecase = usecase.NewAISignalUsecase(deepseek, coingecko)
+		log.Println("AI Signal: DeepSeek API enabled")
+	} else {
+		log.Println("AI Signal: disabled (set DEEPSEEK_API_KEY in .env)")
+	}
+
+	handler := http.NewPortfolioHandler(portfolioUsecase, assetUsecase, signalUsecase, aiSignalUsecase)
 
 	app := fiber.New()
 	app.Use(cors.New())
@@ -33,6 +46,8 @@ func main() {
 	api := app.Group("/api/v1")
 	api.Get("/portfolio", handler.GetPortfolio)
 	api.Get("/asset/:symbol", handler.GetAssetDetail)
+	api.Get("/asset/:symbol/signal", handler.GetSignal)
+	api.Get("/asset/:symbol/ai-signal", handler.GetAISignal)
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {

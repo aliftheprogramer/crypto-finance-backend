@@ -22,8 +22,9 @@ type SourcesFile struct {
 }
 
 type Config struct {
-	Port    string
-	Sources []SourceConfig
+	Port           string
+	DeepSeekAPIKey string
+	Sources        []SourceConfig
 }
 
 func Load() *Config {
@@ -39,8 +40,9 @@ func Load() *Config {
 	sources := loadSources()
 
 	cfg := &Config{
-		Port:    port,
-		Sources: sources,
+		Port:           port,
+		DeepSeekAPIKey: os.Getenv("DEEPSEEK_API_KEY"),
+		Sources:        sources,
 	}
 
 	if len(cfg.Sources) == 0 {
