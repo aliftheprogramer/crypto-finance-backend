@@ -35,13 +35,6 @@ func (uc *NewsUsecase) Refresh() error {
 
 	for _, item := range news {
 		tags := strings.Join(item.Tags, ",")
-		cats := repository.CategoriesFromTags(item.Tags)
-		if cats != "General" {
-			if tags != "" {
-				tags += ","
-			}
-			tags += cats
-		}
 		if err := repository.SaveNewsRaw(item.Title, item.URL, item.Source, item.PublishedAt, item.ContentSnippet, tags); err != nil {
 			log.Printf("[news] skip duplicate: %s", item.Title)
 		}

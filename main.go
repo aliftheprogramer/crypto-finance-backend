@@ -46,7 +46,7 @@ func main() {
 		log.Println("AI Signal: disabled")
 	}
 
-	newsProvider := repository.NewNewsProvider(cfg.CryptoPanicAPIKey)
+	newsProvider := repository.NewNewsProvider()
 	newsUsecase := usecase.NewNewsUsecase(newsProvider, deepseek)
 	log.Println("Daily Briefing: enabled")
 
