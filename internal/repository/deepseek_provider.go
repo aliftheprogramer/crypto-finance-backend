@@ -49,14 +49,18 @@ type deepseekResponse struct {
 }
 
 func (d *DeepSeekProvider) Analyze(prompt string) (content string, promptTokens, completionTokens int, err error) {
+	return d.Chat("Kamu adalah analis kripto profesional. Selalu berikan analisa dalam bahasa Indonesia. Output dalam format JSON.", prompt, 0.3, 1000)
+}
+
+func (d *DeepSeekProvider) Chat(systemPrompt, userPrompt string, temperature float64, maxTokens int) (content string, promptTokens, completionTokens int, err error) {
 	body := deepseekRequest{
 		Model: "deepseek-chat",
 		Messages: []deepseekMessage{
-			{Role: "system", Content: "Kamu adalah analis kripto profesional. Selalu berikan analisa dalam bahasa Indonesia. Output dalam format JSON."},
-			{Role: "user", Content: prompt},
+			{Role: "system", Content: systemPrompt},
+			{Role: "user", Content: userPrompt},
 		},
-		Temperature: 0.3,
-		MaxTokens:   1000,
+		Temperature: temperature,
+		MaxTokens:   maxTokens,
 	}
 
 	payload, err := json.Marshal(body)

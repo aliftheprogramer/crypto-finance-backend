@@ -14,14 +14,16 @@ type PortfolioHandler struct {
 	assetUsecase     domain.AssetUsecase
 	signalUsecase    *usecase.SignalUsecase
 	aiSignalUsecase  *usecase.AISignalUsecase
+	newsUsecase      *usecase.NewsUsecase
 }
 
-func NewPortfolioHandler(portfolioUsecase domain.PortfolioUsecase, assetUsecase domain.AssetUsecase, signalUsecase *usecase.SignalUsecase, aiSignalUsecase *usecase.AISignalUsecase) *PortfolioHandler {
+func NewPortfolioHandler(portfolioUsecase domain.PortfolioUsecase, assetUsecase domain.AssetUsecase, signalUsecase *usecase.SignalUsecase, aiSignalUsecase *usecase.AISignalUsecase, newsUsecase *usecase.NewsUsecase) *PortfolioHandler {
 	return &PortfolioHandler{
 		portfolioUsecase: portfolioUsecase,
 		assetUsecase:     assetUsecase,
 		signalUsecase:    signalUsecase,
 		aiSignalUsecase:  aiSignalUsecase,
+		newsUsecase:      newsUsecase,
 	}
 }
 
@@ -123,4 +125,19 @@ func (h *PortfolioHandler) GetAISignal(c *fiber.Ctx) error {
 	}
 	log.Printf("[http] GET /api/v1/asset/%s/ai-signal → 200: %s %.0f%% %s", symbol, signal.Action, signal.Confidence, costStr)
 	return c.JSON(signal)
+}
+
+func (h *PortfolioHandler) GetDailyBriefing(c *fiber.Ctx) error {
+	log.Print("[http] GET /api/v1/news/briefing")
+
+	briefing, err := h.newsUsecase.GetLatestBriefing()
+	if err != nil {
+		log.Printf("[http] GET /api/v1/news/briefing → 404: %v", err)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "belum ada briefing untuk hari ini",
+		})
+	}
+
+	log.Printf("[http] GET /api/v1/news/briefing → 200: %s %s", briefing.SummaryDate, briefing.Sentiment)
+	return c.JSON(briefing)
 }

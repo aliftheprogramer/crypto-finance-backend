@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"encoding/json"
 	"log"
 	"sync"
 	"time"
@@ -67,10 +68,105 @@ func migrate() error {
 		macd_histogram REAL DEFAULT 0,
 		generated_at INTEGER NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS news_raw (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		title TEXT NOT NULL,
+		url TEXT NOT NULL UNIQUE,
+		source TEXT NOT NULL,
+		published_at INTEGER NOT NULL,
+		content_snippet TEXT DEFAULT '',
+		tags TEXT DEFAULT '',
+		fetched_at INTEGER NOT NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS daily_briefings (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		summary_date TEXT NOT NULL UNIQUE,
+		points TEXT NOT NULL,
+		sentiment TEXT NOT NULL DEFAULT 'NEUTRAL',
+		news_count INTEGER DEFAULT 0,
+		created_at INTEGER NOT NULL
+	);
 	`
 
 	_, err := db.Exec(schema)
 	return err
+}
+
+func SaveNewsRaw(title, url, source string, publishedAt int64, snippet, tags string) error {
+	_, err := GetDB().Exec(
+		`INSERT OR IGNORE INTO news_raw (title, url, source, published_at, content_snippet, tags, fetched_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		title, url, source, publishedAt, snippet, tags, Now(),
+	)
+	return err
+}
+
+func CountTodayNews() (int, error) {
+	startOfDay := startOfDayUnix()
+	var count int
+	err := GetDB().QueryRow(
+		"SELECT COUNT(*) FROM news_raw WHERE fetched_at >= ?", startOfDay,
+	).Scan(&count)
+	return count, err
+}
+
+func SaveBriefing(summaryDate string, points []string, sentiment string, newsCount int) error {
+	pointsJSON := marshalJSON(points)
+	_, err := GetDB().Exec(
+		`INSERT INTO daily_briefings (summary_date, points, sentiment, news_count, created_at)
+		 VALUES (?, ?, ?, ?, ?)
+		 ON CONFLICT(summary_date) DO UPDATE SET
+		 	points = excluded.points,
+		 	sentiment = excluded.sentiment,
+		 	news_count = excluded.news_count,
+		 	created_at = excluded.created_at`,
+		summaryDate, pointsJSON, sentiment, newsCount, Now(),
+	)
+	return err
+}
+
+func GetLatestBriefing() (*struct {
+	SummaryDate string
+	Points      string
+	Sentiment   string
+	NewsCount   int
+	CreatedAt   int64
+}, error) {
+	row := GetDB().QueryRow(
+		"SELECT summary_date, points, sentiment, news_count, created_at FROM daily_briefings ORDER BY created_at DESC LIMIT 1",
+	)
+
+	var b struct {
+		SummaryDate string
+		Points      string
+		Sentiment   string
+		NewsCount   int
+		CreatedAt   int64
+	}
+	err := row.Scan(&b.SummaryDate, &b.Points, &b.Sentiment, &b.NewsCount, &b.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &b, nil
+}
+
+func HasTodayBriefing() bool {
+	today := time.Now().Format("2006-01-02")
+	var count int
+	GetDB().QueryRow("SELECT COUNT(*) FROM daily_briefings WHERE summary_date = ?", today).Scan(&count)
+	return count > 0
+}
+
+func startOfDayUnix() int64 {
+	now := time.Now()
+	return time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+}
+
+func marshalJSON(v interface{}) string {
+	b, _ := json.Marshal(v)
+	return string(b)
 }
 
 func SavePriceHistory(symbol string, timestamp int64, price float64) error {

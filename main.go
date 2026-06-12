@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"time"
 
 	"github.com/alif/crypto-portfolio/config"
 	"github.com/alif/crypto-portfolio/domain"
@@ -29,16 +30,27 @@ func main() {
 	assetUsecase := usecase.NewAssetUsecase(coingecko, coingecko, coingecko)
 	signalUsecase := usecase.NewSignalUsecase(coingecko)
 
-	var aiSignalUsecase *usecase.AISignalUsecase
+	var deepseek *repository.DeepSeekProvider
 	if cfg.DeepSeekAPIKey != "" {
-		deepseek := repository.NewDeepSeekProvider(cfg.DeepSeekAPIKey)
-		aiSignalUsecase = usecase.NewAISignalUsecase(deepseek, coingecko)
-		log.Println("AI Signal: DeepSeek API enabled")
+		deepseek = repository.NewDeepSeekProvider(cfg.DeepSeekAPIKey)
+		log.Println("AI: DeepSeek API enabled")
 	} else {
-		log.Println("AI Signal: disabled (set DEEPSEEK_API_KEY in .env)")
+		log.Println("AI: DeepSeek API disabled (set DEEPSEEK_API_KEY in .env)")
 	}
 
-	handler := http.NewPortfolioHandler(portfolioUsecase, assetUsecase, signalUsecase, aiSignalUsecase)
+	var aiSignalUsecase *usecase.AISignalUsecase
+	if deepseek != nil {
+		aiSignalUsecase = usecase.NewAISignalUsecase(deepseek, coingecko)
+		log.Println("AI Signal: enabled")
+	} else {
+		log.Println("AI Signal: disabled")
+	}
+
+	newsProvider := repository.NewNewsProvider(cfg.CryptoPanicAPIKey)
+	newsUsecase := usecase.NewNewsUsecase(newsProvider, deepseek)
+	log.Println("Daily Briefing: enabled")
+
+	handler := http.NewPortfolioHandler(portfolioUsecase, assetUsecase, signalUsecase, aiSignalUsecase, newsUsecase)
 
 	app := fiber.New()
 	app.Use(cors.New())
@@ -48,6 +60,27 @@ func main() {
 	api.Get("/asset/:symbol", handler.GetAssetDetail)
 	api.Get("/asset/:symbol/signal", handler.GetSignal)
 	api.Get("/asset/:symbol/ai-signal", handler.GetAISignal)
+	api.Get("/news/briefing", handler.GetDailyBriefing)
+
+	// Auto-generate daily briefing on startup + every 6 hours
+	go func() {
+		if !newsUsecase.HasTodayBriefing() {
+			log.Println("[news] generating initial briefing...")
+			if err := newsUsecase.Refresh(); err != nil {
+				log.Printf("[news] initial briefing: %v", err)
+			}
+		} else {
+			log.Println("[news] today's briefing already exists")
+		}
+
+		ticker := time.NewTicker(6 * time.Hour)
+		for range ticker.C {
+			log.Println("[news] scheduled refresh...")
+			if err := newsUsecase.Refresh(); err != nil {
+				log.Printf("[news] scheduled refresh: %v", err)
+			}
+		}
+	}()
 
 	log.Printf("Server starting on port %s", cfg.Port)
 	if err := app.Listen(":" + cfg.Port); err != nil {
