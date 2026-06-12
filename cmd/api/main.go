@@ -1,3 +1,8 @@
+// @title Crypto Portfolio API
+// @version 1.0
+// @description Crypto portfolio tracker and trading signal backend with AI-powered recommendations
+// @host localhost:8080
+// @BasePath /api/v1
 package main
 
 import (
@@ -16,7 +21,9 @@ import (
 	predictorusecase "github.com/alif/crypto-portfolio/internal/predictor/usecase"
 	"github.com/alif/crypto-portfolio/internal/shared/coingecko"
 	"github.com/alif/crypto-portfolio/internal/shared/db"
+	_ "github.com/alif/crypto-portfolio/docs"
 	"github.com/alif/crypto-portfolio/internal/shared/deepseek"
+	"github.com/swaggo/fiber-swagger"
 	"github.com/alif/crypto-portfolio/internal/shared/yahoo"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -66,6 +73,23 @@ func main() {
 	api.Get("/asset/:symbol/signal", predictorHandler.GetSignal)
 	api.Get("/asset/:symbol/ai-signal", predictorHandler.GetAISignal)
 	api.Get("/news/briefing", newsHandler.GetDailyBriefing)
+
+	app.Get("/swagger/*", fiberSwagger.WrapHandler)
+	app.Get("/docs", func(c *fiber.Ctx) error {
+		c.Set("Content-Type", "text/html")
+		return c.SendString(`<!doctype html>
+<html>
+<head>
+    <title>Crypto Portfolio API Reference</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+</head>
+<body>
+    <script id="api-reference" data-url="/swagger/doc.json"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@scalar/api-reference"></script>
+</body>
+</html>`)
+	})
 
 	go func() {
 		if !newsUsecase.HasTodayBriefing() {

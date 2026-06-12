@@ -1,0 +1,307 @@
+basePath: /api/v1
+definitions:
+  domain.AIRecommendation:
+    properties:
+      action:
+        type: string
+      reason:
+        type: string
+      target:
+        type: string
+    type: object
+  domain.AISignalResponse:
+    properties:
+      action:
+        type: string
+      confidence:
+        type: number
+      currency:
+        type: string
+      indicators:
+        $ref: '#/definitions/domain.SignalIndicators'
+      reasoning:
+        type: string
+      recommendation:
+        $ref: '#/definitions/domain.AIRecommendation'
+      symbol:
+        type: string
+      usage:
+        $ref: '#/definitions/domain.AIUsage'
+    type: object
+  domain.AIUsage:
+    properties:
+      completion_tokens:
+        type: integer
+      cost_usd:
+        type: number
+      prompt_tokens:
+        type: integer
+      total_tokens:
+        type: integer
+    type: object
+  domain.Asset:
+    properties:
+      amount:
+        type: number
+      location:
+        type: string
+      name:
+        type: string
+      price_change_24h:
+        type: number
+      symbol:
+        type: string
+      value_idr:
+        type: number
+    type: object
+  domain.AssetDetail:
+    properties:
+      changes:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      history:
+        items:
+          $ref: '#/definitions/domain.PricePoint'
+        type: array
+      name:
+        type: string
+      price_idr:
+        type: number
+      symbol:
+        type: string
+    type: object
+  domain.DailyBriefing:
+    properties:
+      generated_at:
+        type: string
+      news_count:
+        type: integer
+      points:
+        items:
+          type: string
+        type: array
+      sentiment:
+        type: string
+      summary_date:
+        type: string
+    type: object
+  domain.Portfolio:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/domain.Asset'
+        type: array
+      exchange_rates:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+      last_updated:
+        type: string
+      total_net_worth_idr:
+        type: number
+    type: object
+  domain.PricePoint:
+    properties:
+      price:
+        type: number
+      timestamp:
+        type: integer
+    type: object
+  domain.SignalIndicators:
+    properties:
+      macd_histogram:
+        type: number
+      macd_line:
+        type: number
+      macd_signal:
+        type: number
+      rsi:
+        type: number
+      sma_50:
+        type: number
+      sma_200:
+        type: number
+    type: object
+  domain.SignalResponse:
+    properties:
+      action:
+        type: string
+      confidence:
+        type: number
+      generated_at:
+        type: integer
+      indicators:
+        $ref: '#/definitions/domain.SignalIndicators'
+      price:
+        type: number
+      reasons:
+        items:
+          type: string
+        type: array
+      symbol:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Crypto portfolio tracker and trading signal backend with AI-powered
+    recommendations
+  title: Crypto Portfolio API
+  version: "1.0"
+paths:
+  /asset/{symbol}:
+    get:
+      consumes:
+      - application/json
+      description: Get detailed information about a specific asset including current
+        price, changes, and historical data
+      parameters:
+      - description: Asset symbol (e.g., BTC, ETH)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.AssetDetail'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get asset detail
+      tags:
+      - portfolio
+  /asset/{symbol}/ai-signal:
+    get:
+      consumes:
+      - application/json
+      description: Get DeepSeek AI-powered trading signal with natural language reasoning
+        and recommendation
+      parameters:
+      - description: Asset symbol (e.g., BTC, ETH)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      - description: 'Currency for price display (default: idr)'
+        in: query
+        name: currency
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.AISignalResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get AI-powered signal
+      tags:
+      - predictor
+  /asset/{symbol}/signal:
+    get:
+      consumes:
+      - application/json
+      description: Get technical analysis signal based on RSI, SMA, and MACD indicators
+        for a specific asset
+      parameters:
+      - description: Asset symbol (e.g., BTC, ETH)
+        in: path
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.SignalResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get trading signal
+      tags:
+      - predictor
+  /news/briefing:
+    get:
+      consumes:
+      - application/json
+      description: Get the latest crypto news briefing aggregated from RSS feeds with
+        AI-powered sentiment analysis
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.DailyBriefing'
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get daily news briefing
+      tags:
+      - news
+  /portfolio:
+    get:
+      consumes:
+      - application/json
+      description: Get aggregated portfolio with all assets, total net worth, and
+        exchange rates
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/domain.Portfolio'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Get portfolio
+      tags:
+      - portfolio
+swagger: "2.0"

@@ -15,6 +15,15 @@ func NewNewsHandler(newsUsecase *usecase.NewsUsecase) *NewsHandler {
 	return &NewsHandler{newsUsecase: newsUsecase}
 }
 
+// GetDailyBriefing returns the latest crypto news briefing with sentiment analysis.
+// @Summary Get daily news briefing
+// @Description Get the latest crypto news briefing aggregated from RSS feeds with AI-powered sentiment analysis
+// @Tags news
+// @Accept json
+// @Produce json
+// @Success 200 {object} domain.DailyBriefing
+// @Failure 404 {object} map[string]interface{}
+// @Router /news/briefing [get]
 func (h *NewsHandler) GetDailyBriefing(c *fiber.Ctx) error {
 	log.Print("[http] GET /api/v1/news/briefing")
 

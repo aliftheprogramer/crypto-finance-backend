@@ -23,6 +23,17 @@ func NewPredictorHandler(signalUsecase *usecase.SignalUsecase, aiSignalUsecase *
 	}
 }
 
+// GetSignal returns a technical analysis trading signal for a specific asset.
+// @Summary Get trading signal
+// @Description Get technical analysis signal based on RSI, SMA, and MACD indicators for a specific asset
+// @Tags predictor
+// @Accept json
+// @Produce json
+// @Param symbol path string true "Asset symbol (e.g., BTC, ETH)"
+// @Success 200 {object} domain.SignalResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /asset/{symbol}/signal [get]
 func (h *PredictorHandler) GetSignal(c *fiber.Ctx) error {
 	symbol := c.Params("symbol")
 	log.Printf("[http] GET /api/v1/asset/%s/signal", symbol)
@@ -44,6 +55,19 @@ func (h *PredictorHandler) GetSignal(c *fiber.Ctx) error {
 	return c.JSON(signal)
 }
 
+// GetAISignal returns an AI-powered trading signal and recommendation using DeepSeek.
+// @Summary Get AI-powered signal
+// @Description Get DeepSeek AI-powered trading signal with natural language reasoning and recommendation
+// @Tags predictor
+// @Accept json
+// @Produce json
+// @Param symbol path string true "Asset symbol (e.g., BTC, ETH)"
+// @Param currency query string false "Currency for price display (default: idr)"
+// @Success 200 {object} domain.AISignalResponse
+// @Failure 400 {object} map[string]interface{}
+// @Failure 503 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /asset/{symbol}/ai-signal [get]
 func (h *PredictorHandler) GetAISignal(c *fiber.Ctx) error {
 	symbol := c.Params("symbol")
 	currency := c.Query("currency", "idr")

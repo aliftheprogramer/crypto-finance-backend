@@ -16,6 +16,15 @@ func NewPortfolioHandler(portfolioUsecase domain.PortfolioUsecase, assetUsecase 
 	return &PortfolioHandler{portfolioUsecase: portfolioUsecase, assetUsecase: assetUsecase}
 }
 
+// GetPortfolio returns the aggregated portfolio with all assets and total net worth in IDR.
+// @Summary Get portfolio
+// @Description Get aggregated portfolio with all assets, total net worth, and exchange rates
+// @Tags portfolio
+// @Accept json
+// @Produce json
+// @Success 200 {object} domain.Portfolio
+// @Failure 500 {object} map[string]interface{}
+// @Router /portfolio [get]
 func (h *PortfolioHandler) GetPortfolio(c *fiber.Ctx) error {
 	log.Print("[http] GET /api/v1/portfolio")
 	portfolio, err := h.portfolioUsecase.GetPortfolio()
@@ -29,6 +38,18 @@ func (h *PortfolioHandler) GetPortfolio(c *fiber.Ctx) error {
 	return c.JSON(portfolio)
 }
 
+// GetAssetDetail returns detailed information about a specific asset including price history.
+// @Summary Get asset detail
+// @Description Get detailed information about a specific asset including current price, changes, and historical data
+// @Tags portfolio
+// @Accept json
+// @Produce json
+// @Param symbol path string true "Asset symbol (e.g., BTC, ETH)"
+// @Success 200 {object} domain.AssetDetail
+// @Failure 400 {object} map[string]interface{}
+// @Failure 404 {object} map[string]interface{}
+// @Failure 500 {object} map[string]interface{}
+// @Router /asset/{symbol} [get]
 func (h *PortfolioHandler) GetAssetDetail(c *fiber.Ctx) error {
 	symbol := c.Params("symbol")
 	log.Printf("[http] GET /api/v1/asset/%s", symbol)

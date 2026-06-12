@@ -2,3 +2,5 @@ portfolio.db
 .git
 .gitignore
 .env
+
+.opencode/

@@ -1,2 +1,9 @@
 sources.yaml
 .env
+
+# Go binary
+api
+api.exe
+
+# MCP server dependencies
+.opencode/mcp/*/node_modules/
